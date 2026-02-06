@@ -1,58 +1,64 @@
-# Abacate Pay PIX para WooCommerce
+# Abacate Pay PIX para WooCommerce - AlfaStageLabs
 
-Integração oficial desenvolvida por [AlfaStageLabs](https://github.com/AlfaStage/wc-abacatepay) para receber pagamentos via PIX instantâneo utilizando a API do Abacate Pay.
+![WooCommerce](https://img.shields.io/badge/WooCommerce-96588a?style=for-the-badge&logo=woocommerce&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white)
+![Version](https://img.shields.io/badge/Version-5.1-green?style=for-the-badge)
 
-## 🚀 Funcionalidades
+A solução definitiva e transparente para receber pagamentos via PIX no seu WooCommerce através do **Abacate Pay**. Mantenha seu cliente na loja, ofereça uma experiência fluida e automatize sua gestão de pedidos.
 
-*   **Checkout Transparente:** O cliente não sai da sua loja para pagar.
-*   **QRCode Dinâmico:** Geração instantânea do QR Code na página de "Pedido Recebido".
-*   **Pix Copia e Cola:** Botão fácil para copiar o código.
-*   **Cronômetro:** Exibição do tempo restante para pagamento.
-*   **Aprovação Automática:** Webhooks configurados para mudar o status do pedido para "Processando" assim que o pagamento é recebido.
-*   **Compatibilidade Total:** Funciona com Checkout Clássico e WooCommerce Blocks (Gutenberg).
-*   **Privacidade:** Envio simplificado de dados (apenas valor e ID do pedido) para evitar erros de validação de cadastro.
+## 🚀 Novidades da Versão 5.1
+
+*   **⚡ Confirmação em Tempo Real:** A página de "Pedido Recebido" monitora o pagamento automaticamente. Assim que o cliente paga, a tela atualiza para "Pagamento Recebido" sem necessidade de recarregar manualmente.
+*   **📧 PIX no E-mail:** O QR Code e o código "Copia e Cola" são incluídos automaticamente no e-mail de "Aguardando Pagamento" enviado ao cliente.
+*   **⏰ Cancelamento Automático:** Rotina interna (Cron) que verifica pedidos expirados e altera o status para "Cancelado" automaticamente, liberando seu estoque.
+
+## ✨ Funcionalidades Principais
+
+*   **Checkout Transparente:** Geração de PIX sem redirecionar o usuário para sites externos.
+*   **Cronômetro Regressivo:** Exibe visualmente quanto tempo o cliente ainda tem para realizar o pagamento.
+*   **Compatibilidade com Blocos:** Suporte total ao novo Checkout de Blocos (Gutenberg) e ao Checkout Clássico.
+*   **ID de Transação Visível:** O ID do Abacate Pay é salvo no pedido e exibido no painel administrativo para fácil conciliação.
+*   **Logs Detalhados:** Sistema de debug completo para monitorar requisições e respostas da API em *WooCommerce > Status > Logs*.
 
 ## 📦 Instalação
 
-1.  Baixe o plugin ou clone este repositório na pasta `wp-content/plugins/wc-abacatepay`.
-2.  Acesse o painel do WordPress.
-3.  Vá em **Plugins > Plugins Instalados**.
-4.  Ative o **Abacate Pay PIX - AlfaStageLabs**.
+1.  Faça o download do plugin ou clone este repositório:
+    ```bash
+    git clone https://github.com/AlfaStage/wc-abacatepay.git
+    ```
+2.  Mova a pasta para `wp-content/plugins/`.
+3.  No seu painel WordPress, vá em **Plugins** e ative o **Abacate Pay PIX - AlfaStageLabs**.
+4.  **Importante:** Se você estiver atualizando de uma versão anterior, desative e ative o plugin para garantir que o agendador de cancelamento automático seja registrado corretamente.
 
-## ⚙️ Configuração (Passo a Passo)
+## ⚙️ Configuração
 
-### 1. Obter Credenciais
-1.  Acesse sua conta no [Abacate Pay](https://abacatepay.com).
-2.  Vá em **API Keys**.
-3.  Crie uma nova chave e certifique-se de marcar as permissões de **Billing** ou **Acesso Total**.
+### 1. No Abacate Pay
+*   Acesse o dashboard do [Abacate Pay](https://abacatepay.com).
+*   Gere uma **API Key** com permissões de **Billing** (Cobrança) ou acesso total.
+*   Na aba **Webhooks**, você precisará da URL gerada pelo plugin (veja abaixo).
 
-### 2. Configurar no WooCommerce
-1.  No WordPress, vá em **WooCommerce > Configurações > Pagamentos**.
-2.  Clique em **Abacate Pay - PIX**.
-3.  Cole sua **API Token**.
-4.  Defina o **Tempo de Expiração** (em minutos) para o QR Code.
-5.  Defina uma senha para o **Webhook Secret** (ou use a gerada automaticamente).
-6.  **Salve as alterações**.
+### 2. No WooCommerce
+*   Vá em **WooCommerce > Configurações > Pagamentos > Abacate Pay - PIX**.
+*   **API Token:** Insira a chave gerada no passo anterior.
+*   **Tempo de Expiração:** Defina em minutos (ex: 15).
+*   **Senha do Webhook:** Crie uma senha segura. Ela será usada para validar as notificações que seu site recebe.
+*   **URL do Webhook:** Copie a URL limpa que aparece no campo e cole-a no painel do Abacate Pay.
 
-### 3. Configurar Webhook (Crucial)
-1.  Após salvar, copie a **URL do Webhook** que aparecerá no campo cinza na página de configuração do plugin.
-2.  Volte ao painel do Abacate Pay.
-3.  Vá na seção **Webhooks** e clique em criar novo.
-4.  Cole a URL copiada.
-5.  Selecione os eventos de pagamento (`billing.paid` ou similar).
+## 🛠 Resolução de Problemas (FAQ)
 
-## 🛠 Troubleshooting (Resolução de Problemas)
+**O status do pedido não muda para "Pago" sozinho?**
+Verifique se você colou a URL do Webhook corretamente no painel do Abacate Pay e se o evento `billing.paid` está selecionado lá.
 
-**Erro: "Insufficient permissions"**
-*   Sua chave de API foi criada sem permissão de criar cobranças. Crie uma nova chave no painel do Abacate Pay e marque todas as permissões.
+**Erro "Insufficient permissions"?**
+Sua chave de API não tem permissão para criar cobranças. Gere uma nova chave no Abacate Pay e certifique-se de marcar as permissões de escrita/cobrança.
 
-**O QR Code não aparece**
-*   Verifique se o Webhook Secret está igual no plugin e na URL colada no Abacate Pay.
-*   Limpe o cache do seu site.
-
-**Logs de Erro**
-*   Para debugar, vá em **WooCommerce > Status > Logs** e procure por `abacatepay` no menu suspenso. O plugin registra todas as requisições e respostas.
+**Onde vejo os erros de pagamento?**
+Acesse **WooCommerce > Status > Logs** e selecione o log `abacatepay` no menu suspenso. Lá você verá exatamente o que foi enviado e o que a API respondeu.
 
 ## 📄 Licença
 
-Desenvolvido por **AlfaStageLabs**.
+Desenvolvido por [AlfaStageLabs](https://github.com/AlfaStage).
+Uso livre para lojas WooCommerce.
+
+---
+*Este plugin não possui vínculo oficial com a marca Abacate Pay, sendo uma integração de comunidade baseada em sua API pública.*
