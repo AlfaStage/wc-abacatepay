@@ -2,8 +2,8 @@
 /*
 Plugin Name: Abacate Pay PIX - AlfaStageLabs
 Plugin URI: https://github.com/AlfaStage/wc-abacatepay
-Description: Integração PIX com correção de leitura do Webhook.
-Version: 4.6
+Description: Integração PIX com Cancelamento Automático e Webhook simplificado.
+Version: 4.8
 Author: AlfaStageLabs
 Author URI: https://github.com/AlfaStage
 Text Domain: wc-abacatepay
@@ -13,6 +13,55 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
+// 1. Registro e Limpeza do Cron Job
+register_activation_hook( __FILE__, 'alfastage_abacate_activate' );
+register_deactivation_hook( __FILE__, 'alfastage_abacate_deactivate' );
+
+function alfastage_abacate_activate() {
+    if ( ! wp_next_scheduled( 'abacatepay_check_expired_orders' ) ) {
+        wp_schedule_event( time(), 'every_minute', 'abacatepay_check_expired_orders' );
+    }
+}
+
+function alfastage_abacate_deactivate() {
+    $timestamp = wp_next_scheduled( 'abacatepay_check_expired_orders' );
+    if ( $timestamp ) {
+        wp_unschedule_event( $timestamp, 'abacatepay_check_expired_orders' );
+    }
+}
+
+add_filter( 'cron_schedules', function ( $schedules ) {
+    $schedules['every_minute'] = array(
+        'interval' => 60,
+        'display'  => __( 'Every Minute' )
+    );
+    return $schedules;
+} );
+
+// 2. Função Cron para cancelar pedidos
+add_action( 'abacatepay_check_expired_orders', 'alfastage_process_expired_orders' );
+
+function alfastage_process_expired_orders() {
+    $orders = wc_get_orders( array(
+        'limit'          => 20,
+        'status'         => 'on-hold',
+        'payment_method' => 'abacatepay',
+    ) );
+
+    foreach ( $orders as $order ) {
+        $expires_at = $order->get_meta( '_abacate_pix_expires_at' );
+        if ( $expires_at ) {
+            $expiry_timestamp = strtotime( $expires_at );
+            $now_timestamp    = time();
+            if ( $now_timestamp > $expiry_timestamp ) {
+                $order->update_status( 'cancelled', __( 'Cancelado automaticamente: Tempo do PIX expirou.', 'wc-abacatepay' ) );
+                $order->save();
+            }
+        }
+    }
+}
+
+// 3. Inicialização do Gateway
 add_action( 'plugins_loaded', 'alfastage_init_gateway_class' );
 
 function alfastage_init_gateway_class() {
@@ -63,10 +112,20 @@ function alfastage_init_gateway_class() {
                 'expiration_minutes' => array( 'title' => 'Tempo de Expiração (Min)', 'type' => 'number', 'default' => '15' ),
                 'api_key' => array( 'title' => 'API Token', 'type' => 'password' ),
                 'webhook_secret' => array( 'title' => 'Senha do Webhook', 'type' => 'text', 'default' => wp_generate_password(10, false) ),
+                
+                // MUDANÇA: Campo de texto nativo do WC, somente leitura, limpo
                 'webhook_url_display' => array(
-                    'title' => 'URL do Webhook',
-                    'type' => 'title',
-                    'description' => '<b>Copie esta URL:</b> <br><input type="text" readonly value="' . esc_attr($final_url) . '" style="width:100%; background:#eee;">'
+                    'title'             => 'URL do Webhook',
+                    'type'              => 'text',
+                    'description'       => 'Copie e cole no painel do Abacate Pay.',
+                    'desc_tip'          => true,
+                    'default'           => $final_url,
+                    'value'             => $final_url, // Força o valor calculado
+                    'custom_attributes' => array(
+                        'readonly' => 'readonly',
+                        'onclick'  => 'this.select();' // Seleciona tudo ao clicar
+                    ),
+                    'css'               => 'background-color: #f0f0f1; cursor: copy; width: 100%;'
                 )
             );
         }
@@ -120,6 +179,7 @@ function alfastage_init_gateway_class() {
                 }
 
                 if ( $http_code >= 200 && $http_code < 300 && $data ) {
+                    
                     $order->update_meta_data( '_abacate_pix_code', $data['brCode'] );
                     $order->update_meta_data( '_abacate_pix_id', $data['id'] );
                     $order->update_meta_data( '_abacate_pix_base64', $data['brCodeBase64'] ?? '' );
@@ -149,6 +209,12 @@ function alfastage_init_gateway_class() {
 
         public function show_pix_on_thankyou_page( $order_id ) {
             $order = wc_get_order( $order_id );
+            
+            if( $order->has_status('cancelled') ) {
+                echo '<div style="margin: 20px 0; padding: 20px; background: #ffebeb; color: #a00; border: 1px solid #d00; border-radius:5px; text-align:center;"><h3>Pedido Cancelado</h3><p>O tempo para pagamento do PIX expirou.</p></div>';
+                return;
+            }
+
             if(!$order || $order->get_payment_method() !== $this->id || $order->has_status(['processing','completed'])) return;
 
             $code = $order->get_meta( '_abacate_pix_code' );
@@ -190,6 +256,7 @@ function alfastage_init_gateway_class() {
                         clearInterval(x);
                         document.getElementById("pix-countdown").innerHTML = "QR CODE EXPIRADO";
                         document.querySelector(".abacate-pix-container").style.opacity = "0.5";
+                        setTimeout(function(){ location.reload(); }, 2000);
                         return;
                     }
                     var m = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
@@ -210,88 +277,46 @@ function alfastage_init_gateway_class() {
 
         public function webhook_handler() {
             $logger = wc_get_logger();
-            
-            // 1. Validação do Secret
             $s = $this->get_option('webhook_secret');
-            if(empty($s) || ($_GET['webhookSecret'] ?? '') !== $s) { 
-                status_header(403); exit('Forbidden'); 
-            }
-            
-            // 2. Leitura dos dados
+            if(empty($s) || ($_GET['webhookSecret'] ?? '') !== $s) { status_header(403); exit; }
             $payload = file_get_contents('php://input');
-            $data = json_decode($payload, true);
+            wc_get_logger()->info( 'WEBHOOK: ' . $payload, array( 'source' => 'abacatepay' ) );
+            $d = json_decode($payload, true);
             
-            // Log para debug
-            $logger->info( 'WEBHOOK RAW: ' . $payload, array( 'source' => 'abacatepay' ) );
-
-            // 3. Extração do ID da transação
-            // Tenta pegar o ID dentro de 'pixQrCode' (formato novo) ou 'billing' ou raiz
             $tx_id = null;
-            if ( isset( $data['data']['pixQrCode']['id'] ) ) {
-                $tx_id = $data['data']['pixQrCode']['id'];
-            } elseif ( isset( $data['data']['id'] ) ) {
-                $tx_id = $data['data']['id'];
-            } elseif ( isset( $data['data']['billing']['id'] ) ) {
-                $tx_id = $data['data']['billing']['id'];
-            }
+            if ( isset( $d['data']['pixQrCode']['id'] ) ) $tx_id = $d['data']['pixQrCode']['id'];
+            elseif ( isset( $d['data']['id'] ) ) $tx_id = $d['data']['id'];
+            elseif ( isset( $d['data']['billing']['id'] ) ) $tx_id = $d['data']['billing']['id'];
 
-            if ( ! $tx_id ) {
-                $logger->error( 'WEBHOOK: ID não encontrado no payload.', array( 'source' => 'abacatepay' ) );
-                status_header(200); exit;
-            }
+            $order_id_from_meta = $d['data']['metadata']['externalId'] ?? null;
+            $order = null;
+            if ( $order_id_from_meta ) { $order = wc_get_order( $order_id_from_meta ); }
+            elseif ( $tx_id ) { $orders = wc_get_orders(['limit'=>1, 'meta_key'=>'_abacate_pix_id', 'meta_value'=>$tx_id]); if(!empty($orders)) $order = $orders[0]; }
+            
+            if ( $order && ! $order->is_paid() ) {
+                $status = $d['data']['status'] ?? '';
+                $event  = $d['event'] ?? '';
+                $pixStatus = $d['data']['pixQrCode']['status'] ?? '';
 
-            // 4. Busca do Pedido pelo ID salvo
-            $orders = wc_get_orders(array(
-                'limit' => 1,
-                'meta_key' => '_abacate_pix_id',
-                'meta_value' => $tx_id
-            ));
-
-            if ( empty($orders) ) {
-                $logger->error( "WEBHOOK: Pedido não encontrado para o ID $tx_id", array( 'source' => 'abacatepay' ) );
-                status_header(200); exit;
-            }
-
-            $order = $orders[0];
-
-            // 5. Validação do Status
-            if ( ! $order->is_paid() ) {
-                $event = $data['event'] ?? '';
-                $status_pix = $data['data']['pixQrCode']['status'] ?? '';
-                $status_billing = $data['data']['status'] ?? '';
-
-                $pago = false;
-
-                // Verifica se é evento de pago ou se o status interno é PAID
-                if ( $event === 'billing.paid' || $status_pix === 'PAID' || $status_billing === 'PAID' || $status_billing === 'COMPLETED' ) {
-                    $pago = true;
-                }
-
-                if ( $pago ) {
+                if ( in_array($status, ['PAID','COMPLETED']) || in_array($event, ['billing.paid','pix.received']) || $pixStatus === 'PAID' ) {
                     $order->payment_complete( $tx_id );
-                    $order->add_order_note( "Pagamento confirmado via Webhook Abacate Pay (ID: $tx_id)." );
-                    $logger->info( "WEBHOOK: Pedido #{$order->get_id()} atualizado para PAGO.", array( 'source' => 'abacatepay' ) );
+                    $order->add_order_note( 'Pagamento PIX confirmado. ID: ' . $tx_id );
                 }
-            } else {
-                $logger->info( "WEBHOOK: Pedido #{$order->get_id()} já estava pago.", array( 'source' => 'abacatepay' ) );
             }
-
-            status_header(200);
-            exit;
+            status_header(200); exit;
         }
     }
     add_filter( 'woocommerce_payment_gateways', function( $methods ) { $methods[] = 'WC_AbacatePay_Gateway'; return $methods; } );
 }
 
-add_action( 'woocommerce_blocks_loaded', 'alfastage_abacatepay_blocks_init' );
-function alfastage_abacatepay_blocks_init() {
+add_action( 'woocommerce_blocks_payment_method_type_registration', function( $registry ) {
     if ( ! class_exists( 'Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType' ) ) return;
     class WC_AbacatePay_Blocks_Support extends Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType {
         protected $name = 'abacatepay';
         public function initialize() { $this->settings = get_option( 'woocommerce_abacatepay_settings', [] ); }
         public function is_active() { return ! empty( $this->settings['enabled'] ) && 'yes' === $this->settings['enabled']; }
         public function get_payment_method_script_handles() {
-            wp_register_script('wc-abacatepay-blocks', plugin_dir_url( __FILE__ ) . 'block.js', array( 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities', 'wp-i18n' ), '4.6', true);
+            wp_register_script('wc-abacatepay-blocks', plugin_dir_url( __FILE__ ) . 'block.js', array( 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities', 'wp-i18n' ), '4.8', true);
             return array( 'wc-abacatepay-blocks' );
         }
         public function get_payment_method_data() {
@@ -303,5 +328,5 @@ function alfastage_abacatepay_blocks_init() {
             );
         }
     }
-    add_action( 'woocommerce_blocks_payment_method_type_registration', function( $registry ) { $registry->register( new WC_AbacatePay_Blocks_Support() ); } );
-}
+    $registry->register( new WC_AbacatePay_Blocks_Support() );
+} );
