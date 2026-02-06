@@ -2,7 +2,7 @@
 
 ![WooCommerce](https://img.shields.io/badge/WooCommerce-96588a?style=for-the-badge&logo=woocommerce&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white)
-![Version](https://img.shields.io/badge/Version-5.1-green?style=for-the-badge)
+![Version](https://img.shields.io/badge/Version-5.2-green?style=for-the-badge)
 
 A solução definitiva e transparente para receber pagamentos via PIX no seu WooCommerce através do **Abacate Pay**. Mantenha seu cliente na loja, ofereça uma experiência fluida e automatize sua gestão de pedidos.
 
