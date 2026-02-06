@@ -1,9 +1,9 @@
 <?php
 /*
 Plugin Name: Abacate Pay PIX - AlfaStageLabs
-Plugin URI: https://github.com/AlfaStage
-Description: Integração PIX com novo ícone e logs detalhados.
-Version: 4.5
+Plugin URI: https://github.com/AlfaStage/wc-abacatepay
+Description: Integração PIX com correção de leitura do Webhook.
+Version: 4.6
 Author: AlfaStageLabs
 Author URI: https://github.com/AlfaStage
 Text Domain: wc-abacatepay
@@ -26,8 +26,7 @@ function alfastage_init_gateway_class() {
 
         public function __construct() {
             $this->id                 = 'abacatepay'; 
-            // NOVO ÍCONE (Base64 enviado)
-            $this->icon               = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciICB2aWV3Qm94PSIwIDAgNDggNDgiIHdpZHRoPSIxNTBweCIgaGVpZ2h0PSIxNTBweCIgYmFzZVByb2ZpbGU9ImJhc2ljIj48cGF0aCBmaWxsPSIjNGRiNmFjIiBkPSJNMTEuOSwxMmgtMC42OGw4LjA0LTguMDRjMi42Mi0yLjYxLDYuODYtMi42MSw5LjQ4LDBMMzYuNzgsMTJIMzYuMWMtMS42LDAtMy4xMSwwLjYyLTQuMjQsMS43NglsLTYuOCw2Ljc3Yy0wLjU5LDAuNTktMS41MywwLjU5LTIuMTIsMGwtNi44LTYuNzdDMTUuMDEsMTIuNjIsMTMuNSwxMiwxMS45LDEyeiIvPjxwYXRoIGZpbGw9IiM0ZGI2YWMiIGQ9Ik0zNi4xLDM2aDAuNjhsLTguMDQsOC4wNGMtMi42MiwyLjYxLTYuODYsMi42MS05LjQ4LDBMMTEuMjIsMzZoMC42OGMxLjYsMCwzLjExLTAuNjIsNC4yNC0xLjc2CWw2LjgtNi43N2MwLjU5LTAuNTksMS41My0wLjU5LDIuMTIsMGw2LjgsNi43N0MzMi45OSwzNS4zOCwzNC41LDM2LDM2LjEsMzZ6Ii8+PHBhdGggZmlsbD0iIzRkYjZhYyIgZD0iTTQ0LjA0LDI4Ljc0TDM4Ljc4LDM0SDM2LjFjLTEuMDcsMC0yLjA3LTAuNDItMi44My0xLjE3bC02LjgtNi43OGMtMS4zNi0xLjM2LTMuNTgtMS4zNi00Ljk0LDAJbC02LjgsNi43OEMxMy45NywzMy41OCwxMi45NywzNCwxMS45LDM0SDkuMjJsLTUuMjYtNS4yNmMtMi42MS0yLjYyLTIuNjEtNi44NiwwLTkuNDhMOS4yMiwxNGgyLjY4YzEuMDcsMCwyLjA3LDAuNDIsMi44MywxLjE3CWw2LjgsNi43OGMwLjY4LDAuNjgsMS41OCwxLjAyLDIuNDcsMS4wMnMxLjc5LTAuMzQsMi40Ny0xLjAybDYuOC02Ljc4QzM0LjAzLDE0LDM1LjAzLDE0LDM2LjEsMTRoMi42OGw1LjI2LDUuMjYJQzQ2LjY1LDIxLjg4LDQ2LjY1LDI2LjEyLDQ0LjA0LDI4Ljc0eiIvPjwvc3ZnPg==';
+            $this->icon               = 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciICB2aWV3Qm94PSIwIDAgNDggNDgiIHdpZHRoPSIxNTBweCIgaGVpZ2h0PSIxNTBweCIgYmFzZVByb2ZpbGU9ImJhc2ljIj48cGF0aCBmaWxsPSIjNGRiNmFjIiBkPSJNMTEuOSwxMmgtMC42OGw4LjA0LTguMDRjMi42Mi0yLjYxLDYuODYtMi42MSw5LjQ4LDBMMzYuNzgsMTJIMzYuMWMtMS42LDAtMy4xMSwwLjYyLTQuMjQsMS43NglsLTYuOCw2Ljc3Yy0wLjU5LDAuNTktMS41MywwLjU5LTIuMTIsMGwtNi44LTYuNzdDMTUuMDEsMTIuNjIsMTMuNSwxMiwxMS45LDEyeiIvPjxwYXRoIGZpbGw9IiM0ZGI2YWMiIGQ9Ik0zNi4xLDM2aDAuNjhsLTguMDQsOC4wNGMtMi42MiwyLjYxLTYuODYsMi42MS05LjQ4LDBMMTEuMjIsMzZoMC42OGMxLjYsMCwzLjExLTAuNjIsNC4yNC0xLjc2CWw2LjgtNi43N2MwLjU5LTAuNTksMS41My0wLjU5LDIuMTIsMGw2LjgsNi43N0MzMi45OSwzNS4zOCwzNC41LDM2LDM2LjEsMzZ6Ii8+PHBhdGggZmlsbD0iIzRkYjZhYyIgZD0iTTQ0LjA0LDI4Ljc0TDM4Ljc4LDM0SDM2LjFjLTEuMDcsMC0yLjA3LTAuNDItMi44My0xLjE3bC02LjgtNi43OGMtMS4zNi0xLjM2LTMuNTgtMS4zNi00Ljk0LDAJbC02LjgsNi43OEMxMy45NywzMy41OCwxMi45NywzNCwxMS45LDM0SDkuMjJsLTUuMjYtNS4yNmMtMi42MS0yLjYyLTIuNjEtNi44NiwwLTkuNDhMOS4yMiwxNGgyLjY4YzEuMDcsMCwyLjA3LDAuNDIsMi44MywxLjE3CWw2LjgsNi43OGMwLjY4LDAuNjgsMS41OCwxLjAyLDIuNDcsMS4wMnMxLjc5LTAuMzQsMi40Ny0xLjAybDYuOC02Ljc4QzM0LjAzLDE0LjQyLDM1LjAzLDE0LDM2LjEsMTRoMi42OGw1LjI2LDUuMjYJQzQ2LjY1LDIxLjg4LDQ2LjY1LDI2LjEyLDQ0LjA0LDI4Ljc0eiIvPjwvc3ZnPg==';
             $this->has_fields         = false;
             $this->method_title       = 'Abacate Pay - PIX';
             $this->method_description = 'PIX via Abacate Pay (AlfaStageLabs).';
@@ -45,8 +44,6 @@ function alfastage_init_gateway_class() {
             add_action( 'woocommerce_update_options_payment_gateways_' . $this->id, array( $this, 'process_admin_options' ) );
             add_action( 'woocommerce_thankyou_' . $this->id, array( $this, 'show_pix_on_thankyou_page' ) );
             add_action( 'woocommerce_api_wc_abacatepay_gateway', array( $this, 'webhook_handler' ) );
-            
-            // Exibir ID no Admin
             add_action( 'woocommerce_admin_order_data_after_billing_address', array( $this, 'display_abacate_id_in_admin' ) );
         }
 
@@ -82,7 +79,6 @@ function alfastage_init_gateway_class() {
                 $amount_cents = intval( round( $order->get_total() * 100 ) );
                 $expires_in_seconds = intval( $this->expiration_minutes ) * 60;
                 
-                // PAYLOAD SIMPLIFICADO (Sem dados de cliente para evitar erros)
                 $payload = array(
                     'amount'      => $amount_cents,
                     'expiresIn'   => $expires_in_seconds,
@@ -124,13 +120,10 @@ function alfastage_init_gateway_class() {
                 }
 
                 if ( $http_code >= 200 && $http_code < 300 && $data ) {
-                    
-                    // Salva Meta Dados e Campo Personalizado
                     $order->update_meta_data( '_abacate_pix_code', $data['brCode'] );
                     $order->update_meta_data( '_abacate_pix_id', $data['id'] );
                     $order->update_meta_data( '_abacate_pix_base64', $data['brCodeBase64'] ?? '' );
                     $order->update_meta_data( '_abacate_pix_expires_at', $data['expiresAt'] ?? '' );
-                    
                     $order->update_meta_data( 'abacate_transaction_id', $data['id'] );
                     
                     $order->update_status( 'on-hold', 'Aguardando PIX' );
@@ -161,44 +154,33 @@ function alfastage_init_gateway_class() {
             $code = $order->get_meta( '_abacate_pix_code' );
             $b64  = $order->get_meta( '_abacate_pix_base64' );
             $expires_at = $order->get_meta( '_abacate_pix_expires_at' );
-
             $src = (strpos($b64, 'data:') === 0) ? $b64 : 'data:image/png;base64,'.$b64;
             
             ?>
             <div class="abacate-pix-container" style="margin: 30px 0; padding: 25px; border: 2px solid #e1e1e1; border-radius: 8px; text-align: center; background: #fff;">
                 <h3 style="margin-top:0;">Pague com PIX</h3>
-                
                 <?php if($expires_at): ?>
                     <div id="pix-countdown" style="font-size: 1.2em; color: #d63638; font-weight: bold; margin-bottom: 15px;">
                         Expira em: <span id="timer-display">--:--</span>
                     </div>
                 <?php endif; ?>
-
                 <?php if($b64): ?>
                     <img src="<?php echo esc_attr($src); ?>" style="max-width: 250px; height: auto; display: block; margin: 0 auto 15px; border: 1px solid #ccc; padding: 5px;">
                 <?php endif; ?>
-
                 <div style="margin-top: 15px;">
                     <label style="display:block; font-weight:600; margin-bottom: 5px;">Código Copia e Cola:</label>
                     <textarea id="pix-code-field" readonly style="width: 100%; height: 80px; font-size: 12px; background: #f7f7f7; padding: 10px; border: 1px solid #ccc;"><?php echo esc_textarea($code); ?></textarea>
-                    
-                    <button type="button" id="btn-copy-pix" style="margin-top: 10px; padding: 10px 20px; cursor: pointer; background: #2271b1; color: #fff; border: none; border-radius: 4px; font-size: 16px;">
-                        Copiar Código
-                    </button>
+                    <button type="button" id="btn-copy-pix" style="margin-top: 10px; padding: 10px 20px; cursor: pointer; background: #2271b1; color: #fff; border: none; border-radius: 4px; font-size: 16px;">Copiar Código</button>
                 </div>
             </div>
-
             <script type="text/javascript">
             document.addEventListener("DOMContentLoaded", function() {
                 document.getElementById('btn-copy-pix').addEventListener('click', function() {
                     var copyText = document.getElementById("pix-code-field");
                     copyText.select();
                     copyText.setSelectionRange(0, 99999);
-                    navigator.clipboard.writeText(copyText.value).then(function() {
-                        alert("Código copiado!");
-                    });
+                    navigator.clipboard.writeText(copyText.value).then(function() { alert("Código copiado!"); });
                 });
-
                 <?php if($expires_at): ?>
                 var expiresAt = new Date("<?php echo esc_js($expires_at); ?>").getTime();
                 var x = setInterval(function() {
@@ -227,38 +209,80 @@ function alfastage_init_gateway_class() {
         }
 
         public function webhook_handler() {
+            $logger = wc_get_logger();
+            
+            // 1. Validação do Secret
             $s = $this->get_option('webhook_secret');
-            if(empty($s) || ($_GET['webhookSecret'] ?? '') !== $s) { status_header(403); exit; }
+            if(empty($s) || ($_GET['webhookSecret'] ?? '') !== $s) { 
+                status_header(403); exit('Forbidden'); 
+            }
             
+            // 2. Leitura dos dados
             $payload = file_get_contents('php://input');
-            wc_get_logger()->info( 'WEBHOOK: ' . $payload, array( 'source' => 'abacatepay' ) );
+            $data = json_decode($payload, true);
             
-            $d = json_decode($payload, true);
-            $tx_id = $d['data']['id'] ?? ($d['data']['billing']['id'] ?? null);
-            $order_id_from_meta = $d['data']['metadata']['externalId'] ?? null;
-            $order = null;
+            // Log para debug
+            $logger->info( 'WEBHOOK RAW: ' . $payload, array( 'source' => 'abacatepay' ) );
 
-            if ( $order_id_from_meta ) {
-                $order = wc_get_order( $order_id_from_meta );
-            } elseif ( $tx_id ) {
-                $orders = wc_get_orders(['limit'=>1, 'meta_key'=>'_abacate_pix_id', 'meta_value'=>$tx_id]);
-                if(!empty($orders)) $order = $orders[0];
+            // 3. Extração do ID da transação
+            // Tenta pegar o ID dentro de 'pixQrCode' (formato novo) ou 'billing' ou raiz
+            $tx_id = null;
+            if ( isset( $data['data']['pixQrCode']['id'] ) ) {
+                $tx_id = $data['data']['pixQrCode']['id'];
+            } elseif ( isset( $data['data']['id'] ) ) {
+                $tx_id = $data['data']['id'];
+            } elseif ( isset( $data['data']['billing']['id'] ) ) {
+                $tx_id = $data['data']['billing']['id'];
             }
 
-            if ( $order && ! $order->is_paid() ) {
-                $status = $d['data']['status'] ?? '';
-                $event  = $d['event'] ?? '';
-                if ( in_array($status, ['PAID','COMPLETED']) || in_array($event, ['billing.paid','pix.received']) ) {
-                    $order->payment_complete( $tx_id );
-                    $order->add_order_note( 'Pagamento PIX confirmado. ID: ' . $tx_id );
+            if ( ! $tx_id ) {
+                $logger->error( 'WEBHOOK: ID não encontrado no payload.', array( 'source' => 'abacatepay' ) );
+                status_header(200); exit;
+            }
+
+            // 4. Busca do Pedido pelo ID salvo
+            $orders = wc_get_orders(array(
+                'limit' => 1,
+                'meta_key' => '_abacate_pix_id',
+                'meta_value' => $tx_id
+            ));
+
+            if ( empty($orders) ) {
+                $logger->error( "WEBHOOK: Pedido não encontrado para o ID $tx_id", array( 'source' => 'abacatepay' ) );
+                status_header(200); exit;
+            }
+
+            $order = $orders[0];
+
+            // 5. Validação do Status
+            if ( ! $order->is_paid() ) {
+                $event = $data['event'] ?? '';
+                $status_pix = $data['data']['pixQrCode']['status'] ?? '';
+                $status_billing = $data['data']['status'] ?? '';
+
+                $pago = false;
+
+                // Verifica se é evento de pago ou se o status interno é PAID
+                if ( $event === 'billing.paid' || $status_pix === 'PAID' || $status_billing === 'PAID' || $status_billing === 'COMPLETED' ) {
+                    $pago = true;
                 }
+
+                if ( $pago ) {
+                    $order->payment_complete( $tx_id );
+                    $order->add_order_note( "Pagamento confirmado via Webhook Abacate Pay (ID: $tx_id)." );
+                    $logger->info( "WEBHOOK: Pedido #{$order->get_id()} atualizado para PAGO.", array( 'source' => 'abacatepay' ) );
+                }
+            } else {
+                $logger->info( "WEBHOOK: Pedido #{$order->get_id()} já estava pago.", array( 'source' => 'abacatepay' ) );
             }
-            status_header(200); exit;
+
+            status_header(200);
+            exit;
         }
     }
     add_filter( 'woocommerce_payment_gateways', function( $methods ) { $methods[] = 'WC_AbacatePay_Gateway'; return $methods; } );
 }
-// Mantém compatibilidade com blocos
+
 add_action( 'woocommerce_blocks_loaded', 'alfastage_abacatepay_blocks_init' );
 function alfastage_abacatepay_blocks_init() {
     if ( ! class_exists( 'Automattic\WooCommerce\Blocks\Payments\Integrations\AbstractPaymentMethodType' ) ) return;
@@ -267,15 +291,14 @@ function alfastage_abacatepay_blocks_init() {
         public function initialize() { $this->settings = get_option( 'woocommerce_abacatepay_settings', [] ); }
         public function is_active() { return ! empty( $this->settings['enabled'] ) && 'yes' === $this->settings['enabled']; }
         public function get_payment_method_script_handles() {
-            wp_register_script('wc-abacatepay-blocks', plugin_dir_url( __FILE__ ) . 'block.js', array( 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities', 'wp-i18n' ), '4.5', true);
+            wp_register_script('wc-abacatepay-blocks', plugin_dir_url( __FILE__ ) . 'block.js', array( 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities', 'wp-i18n' ), '4.6', true);
             return array( 'wc-abacatepay-blocks' );
         }
         public function get_payment_method_data() {
             return array(
                 'title' => $this->get_setting( 'title' ),
                 'description' => $this->get_setting( 'description' ),
-                // NOVO ÍCONE AQUI TAMBÉM
-                'icon_url' => 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciICB2aWV3Qm94PSIwIDAgNDggNDgiIHdpZHRoPSIxNTBweCIgaGVpZ2h0PSIxNTBweCIgYmFzZVByb2ZpbGU9ImJhc2ljIj48cGF0aCBmaWxsPSIjNGRiNmFjIiBkPSJNMTEuOSwxMmgtMC42OGw4LjA0LTguMDRjMi42Mi0yLjYxLDYuODYtMi42MSw5LjQ4LDBMMzYuNzgsMTJIMzYuMWMtMS42LDAtMy4xMSwwLjYyLTQuMjQsMS43NglsLTYuOCw2Ljc3Yy0wLjU5LDAuNTktMS41MywwLjU5LTIuMTIsMGwtNi44LTYuNzdDMTUuMDEsMTIuNjIsMTMuNSwxMiwxMS45LDEyeiIvPjxwYXRoIGZpbGw9IiM0ZGI2YWMiIGQ9Ik0zNi4xLDM2aDAuNjhsLTguMDQsOC4wNGMtMi42MiwyLjYxLTYuODYsMi42MS05LjQ4LDBMMTEuMjIsMzZoMC42OGMxLjYsMCwzLjExLTAuNjIsNC4yNC0xLjc2CWw2LjgtNi43N2MwLjU5LTAuNTksMS41My0wLjU5LDIuMTIsMGw2LjgsNi43N0MzMi45OSwzNS4zOCwzNC41LDM2LDM2LjEsMzZ6Ii8+PHBhdGggZmlsbD0iIzRkYjZhYyIgZD0iTTQ0LjA0LDI4Ljc0TDM4Ljc4LDM0SDM2LjFjLTEuMDcsMC0yLjA3LTAuNDItMi44My0xLjE3bC02LjgtNi43OGMtMS4zNi0xLjM2LTMuNTgtMS4zNi00Ljk0LDAJbC02LjgsNi43OEMxMy45NywzMy41OCwxMi45NywzNCwxMS45LDM0SDkuMjJsLTUuMjYtNS4yNmMtMi42MS0yLjYyLTIuNjEtNi44NiwwLTkuNDhMOS4yMiwxNGgyLjY4YzEuMDcsMCwyLjA3LDAuNDIsMi44MywxLjE3CWw2LjgsNi43OGMwLjY4LDAuNjgsMS41OCwxLjAyLDIuNDcsMS4wMnMxLjc5LTAuMzQsMi40Ny0xLjAybDYuOC02Ljc4QzM0LjAzLDE0LDM1LjAzLDE0LDM2LjEsMTRoMi42OGw1LjI2LDUuMjYJQzQ2LjY1LDIxLjg4LDQ2LjY1LDI2LjEyLDQ0LjA0LDI4Ljc0eiIvPjwvc3ZnPg==',
+                'icon_url' => 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciICB2aWV3Qm94PSIwIDAgNDggNDgiIHdpZHRoPSIxNTBweCIgaGVpZ2h0PSIxNTBweCIgYmFzZVByb2ZpbGU9ImJhc2ljIj48cGF0aCBmaWxsPSIjNGRiNmFjIiBkPSJNMTEuOSwxMmgtMC42OGw4LjA0LTguMDRjMi42Mi0yLjYxLDYuODYtMi42MSw5LjQ4LDBMMzYuNzgsMTJIMzYuMWMtMS42LDAtMy4xMSwwLjYyLTQuMjQsMS43NglsLTYuOCw2Ljc3Yy0wLjU5LDAuNTktMS41MywwLjU5LTIuMTIsMGwtNi44LTYuNzdDMTUuMDEsMTIuNjIsMTMuNSwxMiwxMS45LDEyeiIvPjxwYXRoIGZpbGw9IiM0ZGI2YWMiIGQ9Ik0zNi4xLDM2aDAuNjhsLTguMDQsOC4wNGMtMi42MiwyLjYxLTYuODYsMi42MS05LjQ4LDBMMTEuMjIsMzZoMC42OGMxLjYsMCwzLjExLTAuNjIsNC4yNC0xLjc2CWw2LjgtNi43N2MwLjU5LTAuNTksMS41My0wLjU5LDIuMTIsMGw2LjgsNi43N0MzMi45OSwzNS4zOCwzNC41LDM2LDM2LjEsMzZ6Ii8+PHBhdGggZmlsbD0iIzRkYjZhYyIgZD0iTTQ0LjA0LDI4Ljc0TDM4Ljc4LDM0SDM2LjFjLTEuMDcsMC0yLjA3LTAuNDItMi44My0xLjE3bC02LjgtNi43OGMtMS4zNi0xLjM2LTMuNTgtMS4zNi00Ljk0LDAJbC02LjgsNi43OEMxMy45NywzMy41OCwxMi45NywzNCwxMS45LDM0SDkuMjJsLTUuMjYtNS4yNmMtMi42MS0yLjYyLTIuNjEtNi44NiwwLTkuNDhMOS4yMiwxNGgyLjY4YzEuMDcsMCwyLjA3LDAuNDIsMi44MywxLjE3CWw2LjgsNi43OGMwLjY4LDAuNjgsMS41OCwxLjAyLDIuNDcsMS4wMnMxLjc5LTAuMzQsMi40Ny0xLjAybDYuOC02Ljc4QzM0LjAzLDE0LjQyLDM1LjAzLDE0LDM2LjEsMTRoMi42OGw1LjI2LDUuMjYJQzQ2LjY1LDIxLjg4LDQ2LjY1LDI2LjEyLDQ0LjA0LDI4Ljc0eiIvPjwvc3ZnPg==',
                 'supports' => array( 'products' ),
             );
         }
