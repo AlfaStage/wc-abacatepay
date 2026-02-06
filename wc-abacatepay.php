@@ -2,8 +2,8 @@
 /*
 Plugin Name: Abacate Pay PIX - AlfaStageLabs
 Plugin URI: https://github.com/AlfaStage/wc-abacatepay
-Description: Integração PIX com Cancelamento Automático e Webhook simplificado.
-Version: 4.8
+Description: Integração PIX com Cancelamento Automático e URL de Webhook limpa.
+Version: 4.9
 Author: AlfaStageLabs
 Author URI: https://github.com/AlfaStage
 Text Domain: wc-abacatepay
@@ -38,7 +38,7 @@ add_filter( 'cron_schedules', function ( $schedules ) {
     return $schedules;
 } );
 
-// 2. Função Cron para cancelar pedidos
+// 2. Função Cron para cancelar pedidos expirados
 add_action( 'abacatepay_check_expired_orders', 'alfastage_process_expired_orders' );
 
 function alfastage_process_expired_orders() {
@@ -103,7 +103,15 @@ function alfastage_init_gateway_class() {
         public function init_form_fields() {
             $base_webhook = add_query_arg( 'wc-api', 'wc_abacatepay_gateway', home_url( '/' ) );
             $secret = $this->get_option( 'webhook_secret' );
-            $final_url = $base_webhook . ( $secret ? '?webhookSecret=' . $secret : '' );
+            
+            // Lógica para separar URL limpa da Legenda
+            if ( ! empty( $secret ) ) {
+                $final_url = $base_webhook . '?webhookSecret=' . $secret;
+                $webhook_desc = 'Copie e cole no painel do Abacate Pay.';
+            } else {
+                $final_url = $base_webhook;
+                $webhook_desc = '<b style="color: #d63638;">⚠️ Salve uma Senha do Webhook abaixo primeiro para gerar a URL completa!</b>';
+            }
 
             $this->form_fields = array(
                 'enabled' => array( 'title' => 'Habilitar', 'type' => 'checkbox', 'default' => 'yes' ),
@@ -111,21 +119,19 @@ function alfastage_init_gateway_class() {
                 'description' => array( 'title' => 'Descrição', 'type' => 'textarea', 'default' => 'Pague com o app do seu banco.' ),
                 'expiration_minutes' => array( 'title' => 'Tempo de Expiração (Min)', 'type' => 'number', 'default' => '15' ),
                 'api_key' => array( 'title' => 'API Token', 'type' => 'password' ),
-                'webhook_secret' => array( 'title' => 'Senha do Webhook', 'type' => 'text', 'default' => wp_generate_password(10, false) ),
+                'webhook_secret' => array( 'title' => 'Senha do Webhook', 'type' => 'text', 'default' => wp_generate_password(10, false), 'description' => 'Crie uma senha para proteger seu webhook.' ),
                 
-                // MUDANÇA: Campo de texto nativo do WC, somente leitura, limpo
+                // MUDANÇA: Campo de URL agora é 100% limpo
                 'webhook_url_display' => array(
                     'title'             => 'URL do Webhook',
                     'type'              => 'text',
-                    'description'       => 'Copie e cole no painel do Abacate Pay.',
-                    'desc_tip'          => true,
+                    'description'       => $webhook_desc,
                     'default'           => $final_url,
-                    'value'             => $final_url, // Força o valor calculado
                     'custom_attributes' => array(
                         'readonly' => 'readonly',
-                        'onclick'  => 'this.select();' // Seleciona tudo ao clicar
+                        'onclick'  => 'this.select();'
                     ),
-                    'css'               => 'background-color: #f0f0f1; cursor: copy; width: 100%;'
+                    'css'               => 'background-color: #f0f0f1; cursor: copy; width: 100%; font-family: monospace;'
                 )
             );
         }
@@ -142,9 +148,7 @@ function alfastage_init_gateway_class() {
                     'amount'      => $amount_cents,
                     'expiresIn'   => $expires_in_seconds,
                     'description' => 'Pedido ' . $order_id,
-                    'metadata'    => array(
-                        'externalId' => (string) $order_id
-                    )
+                    'metadata'    => array( 'externalId' => (string) $order_id )
                 );
 
                 $logger->info( '>>> REQ ABACATE: ' . json_encode($payload), array( 'source' => 'abacatepay' ) );
@@ -179,7 +183,6 @@ function alfastage_init_gateway_class() {
                 }
 
                 if ( $http_code >= 200 && $http_code < 300 && $data ) {
-                    
                     $order->update_meta_data( '_abacate_pix_code', $data['brCode'] );
                     $order->update_meta_data( '_abacate_pix_id', $data['id'] );
                     $order->update_meta_data( '_abacate_pix_base64', $data['brCodeBase64'] ?? '' );
@@ -190,10 +193,7 @@ function alfastage_init_gateway_class() {
                     $order->save();
                     WC()->cart->empty_cart();
 
-                    return array(
-                        'result'   => 'success',
-                        'redirect' => $this->get_return_url( $order ),
-                    );
+                    return array( 'result' => 'success', 'redirect' => $this->get_return_url( $order ) );
                 } else {
                     $msg_erro = $body['error'] ?? ($body[0]['error'] ?? 'Dados inválidos.');
                     wc_add_notice( 'Erro no pagamento: ' . $msg_erro, 'error' );
@@ -280,7 +280,7 @@ function alfastage_init_gateway_class() {
             $s = $this->get_option('webhook_secret');
             if(empty($s) || ($_GET['webhookSecret'] ?? '') !== $s) { status_header(403); exit; }
             $payload = file_get_contents('php://input');
-            wc_get_logger()->info( 'WEBHOOK: ' . $payload, array( 'source' => 'abacatepay' ) );
+            $logger->info( 'WEBHOOK: ' . $payload, array( 'source' => 'abacatepay' ) );
             $d = json_decode($payload, true);
             
             $tx_id = null;
@@ -300,7 +300,7 @@ function alfastage_init_gateway_class() {
 
                 if ( in_array($status, ['PAID','COMPLETED']) || in_array($event, ['billing.paid','pix.received']) || $pixStatus === 'PAID' ) {
                     $order->payment_complete( $tx_id );
-                    $order->add_order_note( 'Pagamento PIX confirmado. ID: ' . $tx_id );
+                    $order->add_order_note( 'Pagamento PIX confirmado via Webhook.' );
                 }
             }
             status_header(200); exit;
@@ -316,7 +316,7 @@ add_action( 'woocommerce_blocks_payment_method_type_registration', function( $re
         public function initialize() { $this->settings = get_option( 'woocommerce_abacatepay_settings', [] ); }
         public function is_active() { return ! empty( $this->settings['enabled'] ) && 'yes' === $this->settings['enabled']; }
         public function get_payment_method_script_handles() {
-            wp_register_script('wc-abacatepay-blocks', plugin_dir_url( __FILE__ ) . 'block.js', array( 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities', 'wp-i18n' ), '4.8', true);
+            wp_register_script('wc-abacatepay-blocks', plugin_dir_url( __FILE__ ) . 'block.js', array( 'wc-blocks-registry', 'wc-settings', 'wp-element', 'wp-html-entities', 'wp-i18n' ), '4.9', true);
             return array( 'wc-abacatepay-blocks' );
         }
         public function get_payment_method_data() {
